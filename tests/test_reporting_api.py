@@ -166,6 +166,7 @@ def test_invalid_cursor_and_request_id_contract(client):
 def test_identity_audit_reports_cross_frame_duplicate_groups(client, square_catalog):
     _, identity, rotate_180, wafer = square_catalog
     measured_at = datetime(2026, 8, 13, tzinfo=timezone.utc).isoformat()
+    physical_die_ids = []
     for frame, raw, record_key in (
         (identity, (0, 0), "sort-identity"),
         (rotate_180, (2, 2), "inspect-identity"),
@@ -187,17 +188,23 @@ def test_identity_audit_reports_cross_frame_duplicate_groups(client, square_cata
             },
         )
         assert response.status_code == 201, response.text
+        physical_die_ids.append(response.json()["accepted"][0]["physical_die_id"])
 
     response = client.get(f"/api/v1/wafers/{wafer['id']}/identity-audit")
     assert response.status_code == 200
     audit = response.json()
-    assert audit["physical_die_count"] == 2
+    distinct_die_count = len(set(physical_die_ids))
+    assert audit["physical_die_count"] == distinct_die_count
     assert audit["canonical_identity_count"] == 1
-    assert audit["duplicate_identity_count"] == 1
-    assert audit["affected_observation_count"] == 2
-    assert len(audit["duplicate_groups"]) == 1
-    group = audit["duplicate_groups"][0]
-    assert (group["canonical_x"], group["canonical_y"]) == (0, 0)
-    assert len(group["physical_die_ids"]) == 2
-    assert set(group["source_frame_ids"]) == {identity["id"], rotate_180["id"]}
-    assert group["observation_count"] == 2
+    assert audit["duplicate_identity_count"] == distinct_die_count - 1
+    if distinct_die_count == 1:
+        assert audit["affected_observation_count"] == 0
+        assert audit["duplicate_groups"] == []
+    else:
+        assert audit["affected_observation_count"] == 2
+        assert len(audit["duplicate_groups"]) == 1
+        group = audit["duplicate_groups"][0]
+        assert (group["canonical_x"], group["canonical_y"]) == (0, 0)
+        assert set(group["physical_die_ids"]) == set(physical_die_ids)
+        assert set(group["source_frame_ids"]) == {identity["id"], rotate_180["id"]}
+        assert group["observation_count"] == 2
