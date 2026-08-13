@@ -86,6 +86,11 @@ def get_wafer(wafer_id: UUID, session: Session = Depends(get_session)):
     return ReportingService(session).wafer(wafer_id)
 
 
+@router.get("/wafers/{wafer_id}/identity-audit", response_model=schemas.IdentityAuditView)
+def audit_wafer_identity(wafer_id: UUID, session: Session = Depends(get_session)):
+    return ReportingService(session).identity_audit(wafer_id)
+
+
 @router.post(
     "/wafers/{wafer_id}/observation-batches",
     response_model=schemas.BatchView,

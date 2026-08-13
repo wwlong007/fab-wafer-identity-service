@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -71,6 +72,28 @@ class ReportingService:
             ingest_batch_count=batch_count,
             observation_count=observation_count,
             created_at=wafer.created_at,
+        )
+
+    def identity_audit(self, wafer_id: UUID) -> schemas.IdentityAuditView:
+        self.catalog.wafer(wafer_id)
+        die_count, identity_count, duplicates = self.reporting.identity_audit(wafer_id)
+        return schemas.IdentityAuditView(
+            wafer_id=wafer_id,
+            physical_die_count=die_count,
+            canonical_identity_count=identity_count,
+            duplicate_identity_count=sum(len(group.physical_die_ids) - 1 for group in duplicates),
+            affected_observation_count=sum(group.observation_count for group in duplicates),
+            duplicate_groups=[
+                schemas.IdentityDuplicateGroup(
+                    canonical_x=group.canonical_x,
+                    canonical_y=group.canonical_y,
+                    physical_die_ids=group.physical_die_ids,
+                    source_frame_ids=group.source_frame_ids,
+                    observation_count=group.observation_count,
+                )
+                for group in duplicates
+            ],
+            scanned_at=datetime.now(timezone.utc),
         )
 
     def wafers(

@@ -125,6 +125,24 @@ class WaferDetail(WaferSummary):
     observation_count: int
 
 
+class IdentityDuplicateGroup(ApiModel):
+    canonical_x: int
+    canonical_y: int
+    physical_die_ids: list[UUID]
+    source_frame_ids: list[UUID]
+    observation_count: int
+
+
+class IdentityAuditView(ApiModel):
+    wafer_id: UUID
+    physical_die_count: int
+    canonical_identity_count: int
+    duplicate_identity_count: int
+    affected_observation_count: int
+    duplicate_groups: list[IdentityDuplicateGroup]
+    scanned_at: datetime
+
+
 class GridAddress(ApiModel):
     kind: Literal["grid"] = "grid"
     x: int

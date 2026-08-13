@@ -161,3 +161,43 @@ def test_invalid_cursor_and_request_id_contract(client):
 
     generated = client.get("/healthz", headers={"X-Request-ID": "invalid"})
     assert UUID(generated.headers["X-Request-ID"])
+
+
+def test_identity_audit_reports_cross_frame_duplicate_groups(client, square_catalog):
+    _, identity, rotate_180, wafer = square_catalog
+    measured_at = datetime(2026, 8, 13, tzinfo=timezone.utc).isoformat()
+    for frame, raw, record_key in (
+        (identity, (0, 0), "sort-identity"),
+        (rotate_180, (2, 2), "inspect-identity"),
+    ):
+        response = client.post(
+            f"/api/v1/wafers/{wafer['id']}/observation-batches",
+            json={
+                "frame_id": frame["id"],
+                "source_system": frame["code"],
+                "observations": [
+                    {
+                        "record_key": record_key,
+                        "address": {"kind": "grid", "x": raw[0], "y": raw[1]},
+                        "stage": "audit",
+                        "result": "pass",
+                        "measured_at": measured_at,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    response = client.get(f"/api/v1/wafers/{wafer['id']}/identity-audit")
+    assert response.status_code == 200
+    audit = response.json()
+    assert audit["physical_die_count"] == 2
+    assert audit["canonical_identity_count"] == 1
+    assert audit["duplicate_identity_count"] == 1
+    assert audit["affected_observation_count"] == 2
+    assert len(audit["duplicate_groups"]) == 1
+    group = audit["duplicate_groups"][0]
+    assert (group["canonical_x"], group["canonical_y"]) == (0, 0)
+    assert len(group["physical_die_ids"]) == 2
+    assert set(group["source_frame_ids"]) == {identity["id"], rotate_180["id"]}
+    assert group["observation_count"] == 2

@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+from typing import NamedTuple
 from uuid import UUID
 
 from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.orm import Session, selectinload
 
 from fab_identity.domain.errors import NotFoundError
 from fab_identity.domain.pagination import PageCursor
 from fab_identity.infrastructure import models
+
+
+class IdentityDuplicateRow(NamedTuple):
+    canonical_x: int
+    canonical_y: int
+    physical_die_ids: list[UUID]
+    source_frame_ids: list[UUID]
+    observation_count: int
 
 
 def _after_cursor(statement: Select, model, cursor: PageCursor | None) -> Select:
@@ -128,3 +138,53 @@ class ReportingRepository:
             .where(models.IngestBatch.wafer_id == wafer_id)
         )
         return int(die_count or 0), int(batch_count or 0), int(observation_count or 0)
+
+    def identity_audit(
+        self, wafer_id: UUID
+    ) -> tuple[int, int, list[IdentityDuplicateRow]]:
+        observation_counts = (
+            select(
+                models.Observation.physical_die_id.label("physical_die_id"),
+                func.count(models.Observation.id).label("observation_count"),
+            )
+            .group_by(models.Observation.physical_die_id)
+            .subquery()
+        )
+        statement = (
+            select(
+                models.PhysicalDie.canonical_x,
+                models.PhysicalDie.canonical_y,
+                func.array_agg(
+                    aggregate_order_by(models.PhysicalDie.id, models.PhysicalDie.id)
+                ).label("physical_die_ids"),
+                func.array_agg(
+                    aggregate_order_by(
+                        models.PhysicalDie.source_frame_id,
+                        models.PhysicalDie.source_frame_id,
+                    )
+                ).label("source_frame_ids"),
+                func.coalesce(func.sum(observation_counts.c.observation_count), 0).label(
+                    "observation_count"
+                ),
+            )
+            .outerjoin(
+                observation_counts,
+                observation_counts.c.physical_die_id == models.PhysicalDie.id,
+            )
+            .where(models.PhysicalDie.wafer_id == wafer_id)
+            .group_by(models.PhysicalDie.canonical_x, models.PhysicalDie.canonical_y)
+            .order_by(models.PhysicalDie.canonical_y, models.PhysicalDie.canonical_x)
+        )
+        groups = list(self.session.execute(statement))
+        duplicates = [
+            IdentityDuplicateRow(
+                canonical_x=row.canonical_x,
+                canonical_y=row.canonical_y,
+                physical_die_ids=list(row.physical_die_ids),
+                source_frame_ids=list(row.source_frame_ids),
+                observation_count=int(row.observation_count),
+            )
+            for row in groups
+            if len(row.physical_die_ids) > 1
+        ]
+        return sum(len(row.physical_die_ids) for row in groups), len(groups), duplicates
