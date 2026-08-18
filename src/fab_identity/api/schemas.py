@@ -219,7 +219,7 @@ class BatchObservation(ApiModel):
     record_key: str
     stage: str
     result: str
-    source_address: dict[str, Any]
+    source_address: Address
     measured_at: datetime
     attributes: dict[str, Any]
 
@@ -235,7 +235,7 @@ class ObservationView(ApiModel):
     stage: str
     result: str
     measured_at: datetime
-    source_address: dict[str, Any]
+    source_address: Address
     attributes: dict[str, Any]
 
 

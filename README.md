@@ -6,7 +6,9 @@ observations. It exposes a JSON API used by sort, inspection, and retest tools.
 
 The service treats layout geometry as master data. Incoming records retain their
 equipment address for audit while the application also records a normalized die
-coordinate used by operations and export APIs.
+coordinate used by operations and export APIs. A returned observation address
+uses the same grid or shot/site contract accepted by ingest; together with its
+batch frame and reticle profile, it is replayable to the linked physical Die.
 
 ## Development
 

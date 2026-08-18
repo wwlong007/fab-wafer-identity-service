@@ -163,6 +163,66 @@ def test_invalid_cursor_and_request_id_contract(client):
     assert UUID(generated.headers["X-Request-ID"])
 
 
+def test_batch_audit_preserves_shot_site_address_contract(client):
+    layout = create_layout(client, "SHOT-AUDIT-LAYOUT")
+    frame = client.post(
+        f"/api/v1/layouts/{layout['id']}/frames",
+        json={
+            "code": "RETEST",
+            "raw_origin_x": 0,
+            "raw_origin_y": 0,
+            "rotation_deg": 0,
+            "mirror_x": False,
+        },
+    ).json()
+    reticle = client.post(
+        f"/api/v1/layouts/{layout['id']}/reticles",
+        json={
+            "code": "RETICLE-AUDIT",
+            "shot_origin_x": 0,
+            "shot_origin_y": 0,
+            "shot_pitch_x": 2,
+            "shot_pitch_y": 2,
+            "sites": [{"code": "CENTER", "offset_x": 0, "offset_y": 0}],
+        },
+    ).json()
+    wafer = client.post(
+        "/api/v1/wafers",
+        json={"layout_id": layout["id"], "lot_code": "LOT-SHOT", "wafer_number": 1},
+    ).json()
+    response = client.post(
+        f"/api/v1/wafers/{wafer['id']}/observation-batches",
+        json={
+            "frame_id": frame["id"],
+            "reticle_profile_id": reticle["id"],
+            "source_system": "retest",
+            "observations": [
+                {
+                    "record_key": "shot-1",
+                    "address": {
+                        "kind": "shot_site",
+                        "shot_col": 0,
+                        "shot_row": 0,
+                        "site_code": "CENTER",
+                    },
+                    "stage": "retest",
+                    "result": "pass",
+                    "measured_at": datetime(2026, 8, 13, tzinfo=timezone.utc).isoformat(),
+                }
+            ],
+        },
+    )
+    assert response.status_code == 201, response.text
+    detail = client.get(f"/api/v1/observation-batches/{response.json()['batch_id']}")
+    assert detail.status_code == 200
+    assert detail.json()["observations"][0]["source_address"] == {
+        "kind": "shot_site",
+        "shot_col": 0,
+        "shot_row": 0,
+        "site_code": "CENTER",
+    }
+
+
 def test_identity_audit_reports_cross_frame_duplicate_groups(client, square_catalog):
     _, identity, rotate_180, wafer = square_catalog
     measured_at = datetime(2026, 8, 13, tzinfo=timezone.utc).isoformat()
