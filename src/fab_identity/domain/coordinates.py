@@ -52,11 +52,6 @@ class FrameDefinition:
 
 
 def normalize_observed(raw: Point, frame: FrameDefinition, observed: Bounds) -> Point:
-    """Normalize an equipment point using the currently observed batch extent.
-
-    Equipment adapters historically supplied only sparse batches, so this helper
-    reconstructs a local extent from those records. Each adapter owns its inverse.
-    """
     x = raw.x - frame.raw_origin.x
     y = raw.y - frame.raw_origin.y
     width, height = observed.width, observed.height
@@ -75,7 +70,6 @@ def normalize_observed(raw: Point, frame: FrameDefinition, observed: Bounds) -> 
 
 
 def export_observed(canonical: Point, frame: FrameDefinition, observed: Bounds) -> Point:
-    """Legacy export formula maintained separately from ingest normalization."""
     x = canonical.x - observed.min_x
     y = canonical.y - observed.min_y
     width, height = observed.width, observed.height
