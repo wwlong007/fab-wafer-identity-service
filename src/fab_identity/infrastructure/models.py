@@ -152,8 +152,6 @@ class PhysicalDie(Base, TimestampMixin):
     source_y: Mapped[int] = mapped_column(Integer, nullable=False)
     canonical_x: Mapped[int] = mapped_column(Integer, nullable=False)
     canonical_y: Mapped[int] = mapped_column(Integer, nullable=False)
-    # The initial catalog-snapshot rollout records provenance, but the repair
-    # task must make this sufficient for historical source replay.
     source_catalog_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     wafer: Mapped[Wafer] = relationship(back_populates="dies")
