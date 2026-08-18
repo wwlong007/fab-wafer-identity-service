@@ -9,6 +9,9 @@ equipment address for audit while the application also records a normalized die
 coordinate used by operations and export APIs. A returned observation address
 uses the same grid or shot/site contract accepted by ingest; together with its
 batch frame and reticle profile, it is replayable to the linked physical Die.
+The public schema also records catalog provenance for each batch and source Die.
+Historical replay must use the effective catalog captured when the data was
+created, even when the live frame or reticle catalog later evolves.
 
 ## Development
 

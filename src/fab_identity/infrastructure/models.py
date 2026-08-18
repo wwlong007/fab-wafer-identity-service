@@ -152,6 +152,9 @@ class PhysicalDie(Base, TimestampMixin):
     source_y: Mapped[int] = mapped_column(Integer, nullable=False)
     canonical_x: Mapped[int] = mapped_column(Integer, nullable=False)
     canonical_y: Mapped[int] = mapped_column(Integer, nullable=False)
+    # The initial catalog-snapshot rollout records provenance, but the repair
+    # task must make this sufficient for historical source replay.
+    source_catalog_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     wafer: Mapped[Wafer] = relationship(back_populates="dies")
     source_frame: Mapped[CoordinateFrame] = relationship(back_populates="physical_dies")
@@ -173,6 +176,7 @@ class IngestBatch(Base, TimestampMixin):
     )
     source_system: Mapped[str] = mapped_column(String(120), nullable=False)
     record_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    catalog_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     wafer: Mapped[Wafer] = relationship(back_populates="batches")
     observations: Mapped[list[Observation]] = relationship(back_populates="batch")

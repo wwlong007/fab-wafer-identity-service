@@ -55,6 +55,17 @@ class IngestService:
             reticle_profile_id=request.reticle_profile_id,
             source_system=request.source_system,
             record_count=len(prepared),
+            # Public baseline stores only provenance identifiers. The task
+            # requires the complete immutable effective catalog.
+            catalog_snapshot={
+                "layout_id": str(wafer.layout_id),
+                "frame_id": str(frame.id),
+                "reticle_profile_id": (
+                    str(request.reticle_profile_id)
+                    if request.reticle_profile_id is not None
+                    else None
+                ),
+            },
         )
         self.session.add(batch)
         accepted: list[schemas.AcceptedObservation] = []
