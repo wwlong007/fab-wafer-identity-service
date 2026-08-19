@@ -54,12 +54,45 @@ class LayoutPage(ApiModel):
     next_cursor: str | None
 
 
+class TranslateStep(ApiModel):
+    op: Literal["translate"] = "translate"
+    dx: int
+    dy: int
+
+
+class MirrorXStep(ApiModel):
+    op: Literal["mirror_x"] = "mirror_x"
+
+
+class MirrorYStep(ApiModel):
+    op: Literal["mirror_y"] = "mirror_y"
+
+
+class RotateStep(ApiModel):
+    op: Literal["rotate"] = "rotate"
+    degrees: Literal[0, 90, 180, 270]
+
+
+CalibrationStep = Annotated[
+    TranslateStep | MirrorXStep | MirrorYStep | RotateStep,
+    Field(discriminator="op"),
+]
+
+
 class FrameCreate(ApiModel):
     code: str = Field(min_length=1, max_length=80)
     raw_origin_x: int
     raw_origin_y: int
     rotation_deg: Literal[0, 90, 180, 270]
     mirror_x: bool = False
+    parent_frame_id: UUID | None = None
+    calibration_steps: list[CalibrationStep] = Field(default_factory=list, max_length=64)
+
+    @model_validator(mode="after")
+    def reject_ambiguous_legacy_orientation(self) -> "FrameCreate":
+        if self.calibration_steps and (self.rotation_deg != 0 or self.mirror_x):
+            raise ValueError("legacy orientation and calibration_steps must not conflict")
+        return self
 
 
 class FrameView(FrameCreate):

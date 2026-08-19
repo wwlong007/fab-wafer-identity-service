@@ -2,7 +2,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from fab_identity.api import schemas
-from fab_identity.domain.errors import ConflictError
+from fab_identity.domain.coordinates import resolve_frame_chain
+from fab_identity.domain.errors import ConflictError, ValidationError
 from fab_identity.infrastructure import models
 from fab_identity.repositories.catalog import CatalogRepository
 
@@ -38,6 +39,11 @@ class CatalogService:
 
     def create_frame(self, layout_id, request: schemas.FrameCreate) -> schemas.FrameView:
         self.repository.layout(layout_id)
+        parent = None
+        if request.parent_frame_id is not None:
+            parent = self.repository.frame(request.parent_frame_id)
+            if parent.layout_id != layout_id:
+                raise ValidationError("coordinate frame parent belongs to another layout")
         frame = models.CoordinateFrame(layout_id=layout_id, **request.model_dump())
         self.session.add(frame)
         self._commit("frame code already exists for this layout")

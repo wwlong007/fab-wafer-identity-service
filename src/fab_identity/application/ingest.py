@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from fab_identity.api import schemas
 from fab_identity.domain.coordinates import (
     Bounds,
-    FrameDefinition,
     Point,
+    chain_transform,
     flatten_shot_site,
+    resolve_frame_chain,
     normalize_observed,
 )
 from fab_identity.domain.errors import ConflictError, ValidationError
@@ -42,12 +43,17 @@ class IngestService:
                 raise ValidationError("reticle profile does not belong to wafer layout")
 
         prepared = [self._prepare(item, reticle) for item in request.observations]
-        observed = Bounds.enclosing([item.raw for item in prepared])
-        frame_definition = FrameDefinition(
-            raw_origin=Point(frame.raw_origin_x, frame.raw_origin_y),
-            rotation_deg=frame.rotation_deg,
-            mirror_x=frame.mirror_x,
+        geometry = Bounds(
+            wafer.layout.min_x,
+            wafer.layout.max_x,
+            wafer.layout.min_y,
+            wafer.layout.max_y,
         )
+        try:
+            frames = resolve_frame_chain(frame, self.catalog.frame)
+            transform = chain_transform(geometry, frames)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
 
         batch = models.IngestBatch(
             wafer_id=wafer.id,
@@ -72,7 +78,11 @@ class IngestService:
         try:
             self.session.flush()
             for item in prepared:
-                canonical = normalize_observed(item.raw, frame_definition, observed)
+                canonical = transform.inverse().apply(item.raw)
+                if not geometry.contains(canonical):
+                    raise ValidationError(
+                        f"record {item.request.record_key} maps outside layout bounds"
+                    )
                 if (canonical.x, canonical.y) not in valid_mask:
                     raise ValidationError(
                         f"record {item.request.record_key} maps outside the valid die mask"

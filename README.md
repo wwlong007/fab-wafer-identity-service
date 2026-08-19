@@ -13,6 +13,12 @@ The public schema also records catalog provenance for each batch and source Die.
 Historical replay must use the effective catalog captured when the data was
 created, even when the live frame or reticle catalog later evolves.
 
+Coordinate frames may optionally form an acyclic same-layout parent chain.
+Each frame exposes an ordered integer calibration program containing
+translations, axis mirrors, and quarter-turn rotations. Parent transforms run
+before child transforms, and export/re-ingest uses the exact inverse program.
+The legacy scalar frame fields remain supported for existing clients.
+
 ## Development
 
 ```bash

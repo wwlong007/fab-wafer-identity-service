@@ -79,9 +79,19 @@ class CoordinateFrame(Base, TimestampMixin):
     raw_origin_y: Mapped[int] = mapped_column(Integer, nullable=False)
     rotation_deg: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     mirror_x: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    parent_frame_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("coordinate_frames.id"), nullable=True
+    )
+    calibration_steps: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
 
     layout: Mapped[WaferLayout] = relationship(back_populates="frames")
     physical_dies: Mapped[list[PhysicalDie]] = relationship(back_populates="source_frame")
+    parent: Mapped["CoordinateFrame | None"] = relationship(
+        remote_side="CoordinateFrame.id", back_populates="children"
+    )
+    children: Mapped[list["CoordinateFrame"]] = relationship(back_populates="parent")
 
 
 class ReticleProfile(Base, TimestampMixin):

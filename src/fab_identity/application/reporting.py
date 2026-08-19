@@ -184,6 +184,8 @@ class ReportingService:
             raw_origin_y=frame.raw_origin_y,
             rotation_deg=frame.rotation_deg,
             mirror_x=frame.mirror_x,
+            parent_frame_id=frame.parent_frame_id,
+            calibration_steps=frame.calibration_steps or [],
         )
 
     @staticmethod

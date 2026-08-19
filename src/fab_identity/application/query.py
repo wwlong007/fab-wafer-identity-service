@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from fab_identity.api import schemas
-from fab_identity.domain.coordinates import Bounds, FrameDefinition, Point, export_observed
+from fab_identity.domain.coordinates import Bounds, Point, chain_transform
 from fab_identity.domain.errors import ValidationError
 from fab_identity.repositories.catalog import CatalogRepository
 from fab_identity.repositories.dies import DieRepository
@@ -40,11 +40,22 @@ class QueryService:
         frame = self.catalog.frame(frame_id)
         if frame.layout_id != wafer.layout_id:
             raise ValidationError("coordinate frame does not belong to wafer layout")
-        definition = FrameDefinition(
-            raw_origin=Point(frame.raw_origin_x, frame.raw_origin_y),
-            rotation_deg=frame.rotation_deg,
-            mirror_x=frame.mirror_x,
+        geometry = Bounds(
+            wafer.layout.min_x,
+            wafer.layout.max_x,
+            wafer.layout.min_y,
+            wafer.layout.max_y,
         )
+        frames = []
+        current = frame
+        seen = set()
+        while current is not None:
+            if current.id in seen:
+                raise ValidationError("coordinate frame parent cycle")
+            seen.add(current.id)
+            frames.append(current)
+            current = self.catalog.frame(current.parent_frame_id) if current.parent_frame_id else None
+        transform = chain_transform(geometry, list(reversed(frames)))
         dies = self.dies.for_wafer(wafer.id)
         if dies:
             observed = Bounds.enclosing(
@@ -60,7 +71,7 @@ class QueryService:
         records = []
         for die in dies:
             canonical = Point(die.canonical_x, die.canonical_y)
-            raw = export_observed(canonical, definition, observed)
+            raw = transform.apply(canonical)
             records.append(
                 schemas.ExportRecord(
                     physical_die_id=die.id,
